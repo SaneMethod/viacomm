@@ -1,0 +1,40 @@
+{
+    "name": "viacomm",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Thin layer over the fetch API, with built-in support for Vue 3.",
+    "main": "dist/viacomm.js",
+    "scripts": {
+        "build": "rollup -c"
+    },
+    "keywords": [
+        "vue",
+        "fetch",
+        "ajax"
+    ],
+    "author": "sanemethod",
+    "license": "MPL-2.0",
+    "homepage": "https://github.com/SaneMethod/viacomm/blob/master/ReadMe.md",
+    "repository": "https://github.com/SaneMethod/viacomm",
+    "peerDependencies": {
+        "vue": "3.x",
+        "lodash-es": "4.18.0"
+    },
+    "peerDependenciesMeta": {
+        "vue": {
+            "optional": true
+        },
+        "lodash-es": {
+            "optional": true
+        }
+    },
+    "dependencies": {
+
+    },
+    "devDependencies": {
+        "@rollup/plugin-node-resolve": "^15.3.1",
+        "@rollup/plugin-terser": "^1.0.0",
+        "lodash-es": "^4.18.1",
+        "rollup": "^4.62.2"
+    }
+}
