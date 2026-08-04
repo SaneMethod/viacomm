@@ -1,0 +1,94 @@
+export type RequestData = Record<string, unknown> | string | URLSearchParams | FormData | null | undefined;
+
+export type RequestOptionValue<T = unknown> =
+    | T
+    | ((options: RequestOptions) => T);
+
+export type HeaderValue =
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | (() => string | number | boolean | null | undefined);
+
+export type HeaderInit = Record<string, HeaderValue>;
+
+export type HeaderFunction = (
+    url: URL,
+    data: RequestData,
+    options: RequestOptions
+) => HeaderInit;
+
+export type CommHeaders = HeaderInit | HeaderFunction;
+
+export interface RequestOptions extends Omit<RequestInit, "headers" | "body" | "method"> {
+    url: string | URL;
+    data?: RequestData;
+    body?: BodyInit | null | RequestOptionValue<BodyInit | null>;
+    method?: string;
+    headers?: CommHeaders;
+    [key: string]: unknown;
+}
+
+export interface CommDefaults extends Omit<RequestInit, "headers" | "body" | "method"> {
+    method?: string;
+    headers?: CommHeaders;
+    [key: string]: unknown;
+}
+
+export type VerbOptions = Omit<RequestOptions, "method"> & {
+    method?: string;
+};
+
+export type ConfigureOptions = Partial<CommDefaults>;
+
+export class CommError extends Error {
+    response: Response;
+
+    constructor(message: string, response: Response);
+}
+
+export class Comm {
+    defaults: CommDefaults;
+
+    constructor();
+
+    configure(options?: ConfigureOptions | false | null): void;
+
+    request(options: RequestOptions): Promise<Response>;
+
+    json(options?: RequestOptions): Promise<Response>;
+
+    delete(options?: VerbOptions, json?: boolean): Promise<Response>;
+
+    get(options?: VerbOptions, json?: boolean): Promise<Response>;
+
+    head(options?: VerbOptions, json?: boolean): Promise<Response>;
+
+    patch(options?: VerbOptions, json?: boolean): Promise<Response>;
+
+    post(options?: VerbOptions, json?: boolean): Promise<Response>;
+
+    put(options?: VerbOptions, json?: boolean): Promise<Response>;
+
+    options(options?: VerbOptions, json?: boolean): Promise<Response>;
+}
+
+export interface VueApp {
+    config: {
+        globalProperties: Record<string, unknown>;
+    };
+}
+
+export interface CommPlugin {
+    installed?: boolean;
+    (app: VueApp): void;
+}
+
+export const comm: Comm;
+export const install: CommPlugin;
+
+declare const defaultComm: Comm;
+
+export default defaultComm;

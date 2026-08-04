@@ -2056,6 +2056,8 @@ function isString(value) {
 
 const URL = window.URL;
 const clone = window.structuredClone || cloneDeep;
+const verbs = ["delete", "get", "head", "patch", "post", "put", "options"];
+const nobodyVerbs = ["get", "head",];
 
 /**
  * Extends Error to allow us to send through the response from a comm error.
@@ -2070,6 +2072,9 @@ class CommError extends Error{
 
 /**
  * Simple class for controlling ajax requests via fetch.
+ * Instances have convenience methods for each HTTP verb: delete, get, head, patch, post, put, options.
+ * These verb methods accept an options object and an optional json boolean parameter (defaults to true).
+ * When json is true (and the verb is not 'get' or 'head'), the request is sent through the json() method.
  */
 class Comm{
     constructor(){
@@ -2100,14 +2105,24 @@ class Comm{
 
     /**
      * Establish the url and details of the request, and send it.
-     * @param {{headers:<object|Function>=, body:<any>=, url:string, data:object|string=, method:string=}} opts
+     * @param {{headers:(object|Function)=, body:*=, url:string, data:(object|string)=, method:string=}} opts
      * @returns {Promise<Response>}
      */
     request(opts){
         let headers = this.defaults.headers,
             optsHeaders = opts.headers;
 
-        opts = Object.assign({}, this.defaults, opts);
+        // We'll handle these separately, and don't want to expand them as part of the usual opts processing.
+        delete opts.headers;
+
+        // Don't include props found in opts from this.defaults to prevent key insertion order from
+        // being a surprise for consumers of this library; this matters where opts are defined as functions,
+        // which depend on the resolved value of a function opt declared ahead of it.
+        // @See: `evaluates function-valued request options` in the test suite for an example.
+        opts = Object.assign({},
+            Object.fromEntries(Object.entries(this._defaults).filter(([key]) => !(key in opts))),
+            opts
+        );
 
         /**
          * Allow expansion of any opts set as functions to their return values
@@ -2180,26 +2195,80 @@ class Comm{
             }
             return res;
         });
-    };
+    }
 
     /**
      * Simple proxy to request for a common use-case - sending json.
      * @returns {Promise<Response>}
      */
     json(opts){
-        opts = opts || {};
-        opts.headers = Object.assign({}, opts.headers, {
-            Accept: 'application/json, text/plain, */*',
-            'Content-Type': 'application/json',
-        });
+        opts = clone(opts ?? {});
 
-        if (opts.data && !(typeof opts.data === 'string')){
-            opts.data = JSON.stringify(opts.data);
+        let optsHeaders = opts.headers;
+        delete opts.headers;
+        /**
+         * Override default headers to include json content type and accept header,
+         * while still allowing for custom headers and header functions.
+         */
+        opts.headers = (url, data, opts) => {
+            let headers = {};
+            if (isFunction(optsHeaders)){
+                headers = optsHeaders(url, data, opts);
+            } else if (isObject(optsHeaders)){
+                headers = Object.assign({}, optsHeaders);
+            }
+            for (const [key, func] of Object.entries(headers)){
+                if (isFunction(func)){
+                    headers[key] = func(url, data, opts);
+                }
+            }
+            headers['Accept'] = 'application/json, text/plain, */*';
+            headers['Content-Type'] = 'application/json';
+            return headers;
+        };
+
+        /**
+         * Stringify data to send as json if the method is not GET or HEAD, is
+         * an object, and is not a function, FormData, or URLSearchParams.
+         */
+        if (
+            opts.data &&
+            isObject(opts.data) &&
+            !isFunction(opts.data) &&
+            !(opts.data instanceof FormData) &&
+            !(opts.data instanceof URLSearchParams)
+        ){
+            let data = opts.data;
+            delete opts.data;
+            opts.data = (opts) => {
+                if (!nobodyVerbs.includes(opts.method)){
+                    opts.data = JSON.stringify(data);
+                }
+                return opts.data;
+            };
         }
 
         return this.request(opts);
     }
 }
+
+/**
+ * Adds convenience methods for each supported HTTP verb to Comm,
+ * allowing you to make a POST/DELETE/GET/etc. request via a shortcut,
+ * like comm.post('/some/url', {data: {}});
+ * Routes through to comm.json, unless the optional `json` param is false.
+ * @param {object} opts Any additional options to pass to the request.
+ * @param {boolean} json Whether to send the request as json.
+ * @lends Comm.prototype
+ */
+Object.assign(Comm.prototype, verbs.reduce((obj, verb) => {
+    obj[verb] = function(opts, json = true){
+        opts = opts ?? {};
+        opts.method = verb.toUpperCase();
+        return (json && !nobodyVerbs.includes(verb)) ? this.json(opts) : this.request(opts);
+    };
+    return obj;
+}, {}));
 
 // Comm singleton
 const comm = new Comm();
@@ -2219,4 +2288,4 @@ function install(app){
     app.config.globalProperties.$comm = comm;
 }
 
-export { CommError, comm, comm as default, install };
+export { Comm, CommError, comm, comm as default, install };
