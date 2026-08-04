@@ -32,6 +32,12 @@ function response({ok = true, status = 200} = {}) {
     return {
         ok,
         status,
+        clone() {
+            return {
+                ok: this.ok,
+                status: this.status,
+            };
+        },
     };
 }
 
@@ -317,6 +323,238 @@ describe("request", () => {
 
         assert.equal(options.method, "PATCH");
         assert.equal(options.cache, "no-store");
+    });
+
+    it("registers before and after hooks", () => {
+        const client = new Comm();
+        const hook = () => {};
+
+        const h1 = client.hook(hook);
+        const h2 = client.before(hook);
+        const h3 = client.after(hook);
+
+        assert.deepEqual(client._hooks, [
+            {
+                func: hook,
+                pre: true,
+                id: h1,
+            },
+            {
+                func: hook,
+                pre: true,
+                id: h2,
+            },
+            {
+                func: hook,
+                pre: false,
+                id: h3,
+            },
+        ]);
+    });
+});
+
+describe("request hooks", () => {
+    it("runs direct hooks before the request by default", async () => {
+        const fetch = fetchSpy();
+        const client = new Comm();
+        const events = [];
+
+        client.hook((url, data, options) => {
+            events.push({
+                type: "hook",
+                url: url.toString(),
+                data,
+                method: options.method,
+            });
+        });
+
+        await client.request({
+            url: "/users",
+            data: {
+                page: 1,
+            },
+        });
+
+        assert.deepEqual(events, [
+            {
+                type: "hook",
+                url: "https://app.example.test/users?page=1",
+                data: {
+                    page: 1,
+                },
+                method: "GET",
+            },
+        ]);
+        assert.equal(fetch.calls.length, 1);
+    });
+
+    it("runs before hooks before fetch", async () => {
+        const events = [];
+        const client = new Comm();
+
+        globalThis.fetch = async (...args) => {
+            events.push("fetch");
+            return response();
+        };
+
+        client.before(() => {
+            events.push("before");
+        });
+
+        await client.request({
+            url: "/users",
+        });
+
+        assert.deepEqual(events, ["before", "fetch"]);
+    });
+
+    it("runs after hooks after fetch with a cloned response", async () => {
+        const expected = response();
+        const events = [];
+        const client = new Comm();
+
+        globalThis.fetch = async () => {
+            events.push("fetch");
+            return expected;
+        };
+
+        client.after((url, data, options, hookedResponse) => {
+            events.push("after");
+            assert.equal(url.toString(), "https://app.example.test/users");
+            assert.equal(data, undefined);
+            assert.equal(options.method, "GET");
+            assert.notStrictEqual(hookedResponse, expected);
+            assert.deepEqual(hookedResponse, {
+                ok: true,
+                status: 200,
+            });
+            return expected;
+        });
+
+        const actual = await client.request({
+            url: "/users",
+        });
+
+        assert.deepEqual(events, ["fetch", "after"]);
+        assert.strictEqual(actual, expected);
+    });
+
+    it("preserves hook registration order", async () => {
+        const events = [];
+        const client = new Comm();
+
+        globalThis.fetch = async () => {
+            events.push("fetch");
+            return response();
+        };
+
+        const beforeId = client.before(() => {
+            events.push("first");
+        });
+        const secondId = client.hook(() => {
+            events.push("second");
+        }, true);
+        const afterId = client.after((url, data, options, hookedResponse) => {
+            events.push("after");
+            return response({
+                ok: hookedResponse.ok,
+                status: hookedResponse.status,
+            });
+        });
+
+        assert.match(beforeId, /^hook_\d+$/);
+        assert.match(secondId, /^hook_\d+$/);
+        assert.match(afterId, /^hook_\d+$/);
+        assert.notEqual(beforeId, secondId);
+        assert.notEqual(secondId, afterId);
+
+        await client.request({
+            url: "/users",
+        });
+
+        assert.deepEqual(events, ["first", "second", "fetch", "after"]);
+    });
+
+    it("registers before and after hooks with unique ids", () => {
+        const client = new Comm();
+        const hook = () => {};
+
+        const directId = client.hook(hook);
+        const beforeId = client.before(hook);
+        const afterId = client.after(hook);
+
+        assert.match(directId, /^hook_\d+$/);
+        assert.match(beforeId, /^hook_\d+$/);
+        assert.match(afterId, /^hook_\d+$/);
+        assert.notEqual(directId, beforeId);
+        assert.notEqual(beforeId, afterId);
+
+        assert.deepEqual(client._hooks, [
+            {
+                func: hook,
+                pre: true,
+                id: directId,
+            },
+            {
+                func: hook,
+                pre: true,
+                id: beforeId,
+            },
+            {
+                func: hook,
+                pre: false,
+                id: afterId,
+            },
+        ]);
+    });
+
+    it("removes a hook by id", () => {
+        const client = new Comm();
+        const firstHook = () => {};
+        const secondHook = () => {};
+
+        const firstId = client.hook(firstHook);
+        const secondId = client.hook(secondHook);
+
+        client.unhook(firstId);
+
+        assert.deepEqual(client._hooks, [
+            {
+                func: secondHook,
+                pre: true,
+                id: secondId,
+            },
+        ]);
+    });
+
+    it("removes all hooks when passed false", () => {
+        const client = new Comm();
+
+        client.before(() => {});
+        client.after(() => {});
+
+        client.unhook(false);
+
+        assert.deepEqual(client._hooks, []);
+    });
+
+    it("does not execute a hook after it is removed", async () => {
+        const fetch = fetchSpy();
+        const client = new Comm();
+        let calls = 0;
+
+        const hookId = client.before(() => {
+            calls += 1;
+        });
+
+        client.unhook(hookId);
+
+        await client.request({
+            url: "/users",
+        });
+
+        assert.equal(calls, 0);
+        assert.equal(fetch.calls.length, 1);
     });
 });
 

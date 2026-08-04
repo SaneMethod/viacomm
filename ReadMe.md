@@ -313,6 +313,102 @@ try {
 
 The same behavior applies to `json()` and all HTTP verb shortcuts.
 
+## Request Hooks
+
+Hooks allow code to run before a request is sent or after a response is received. Hooks
+may be registered on an individual `Comm` instance or on the shared `comm` singleton.
+
+### Before Hooks
+
+Use `before()` to register a function that runs immediately before `fetch()`:
+
+```js
+const hookId = comm.before(async (url, data, options) => {
+    options.headers.set("X-Request-Started", new Date().toISOString());
+});
+```
+
+Before hooks receive:
+
+1. The resolved request URL as a `URL` instance
+2. The request `data`
+3. The resolved request options object
+
+Hooks are awaited before the request is sent, so asynchronous work can be performed
+before `fetch()` runs.
+
+### After Hooks
+
+Use `after()` to register a function that runs after `fetch()` resolves:
+
+```js
+const hookId = comm.after(async (url, data, options, response) => {
+    // Because we receive a clone of the response,
+    // we can safely drain it and read its body without affecting the original.
+    const requestLog = await response.json();
+    console.log(`${options.method} ${url} returned ${response.status}`);
+    console.log("Request log:", requestLog);
+
+    return response;
+});
+```
+
+After hooks may be synchronous or asynchronous. If an after hook returns a promise,
+ViaComm waits for that promise to resolve before continuing the request pipeline.
+
+After hooks receive the same URL, data, and options arguments, followed by a clone of
+the response. The cloned response allows the hook to inspect or modify its copy without
+changing the response used by the request pipeline.
+
+An after hook should return the response, or a promise that resolves to the response,
+that should continue through the request pipeline. If the response is unsuccessful,
+the returned promise rejects with a `CommError` after the hook has run.
+
+### Using `hook()` Directly
+
+`hook()` can be used when the hook phase should be selected dynamically. Hooks run
+before requests by default; pass `false` as the second argument to register an after hook:
+
+```js
+const beforeId = comm.hook((url, data, options) => {
+    console.log("Sending request:", url.toString());
+});
+
+const afterId = comm.hook(async (url, data, options, response) => {
+    await auditResponse(response);
+    console.log("Received response:", response.status);
+    return response;
+}, false);
+```
+
+Each registration method returns a unique hook ID:
+
+- `hook(func)` and `hook(func, pre)` return the registered hook ID.
+- `before(func)` returns the registered before-hook ID.
+- `after(func)` returns the registered after-hook ID.
+
+### Removing Hooks
+
+Pass a hook ID to `unhook()` to remove that hook:
+
+```js
+const hookId = comm.before(() => {
+    console.log("This runs before requests");
+});
+
+comm.unhook(hookId);
+```
+
+Pass `false` to remove all registered hooks from the client:
+
+```js
+comm.unhook(false);
+```
+
+Hooks are registered independently for each `Comm` instance. Removing hooks from a
+newly created client does not affect hooks registered on the shared singleton, and
+vice versa.
+
 ## Using ViaComm with Vue 3
 
 ViaComm can be installed as a Vue 3 plugin. Installation exposes the shared singleton as `$comm` on every component.
