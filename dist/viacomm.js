@@ -1,4 +1,4 @@
-import { isFunction, isString, isObject, cloneDeep } from 'lodash-es';
+import { uniqueId, isFunction, isString, isObject, cloneDeep } from 'lodash-es';
 
 /**
  * Simple central point for interacting with the server, and a thin layer over the fetch API.
@@ -41,6 +41,7 @@ class Comm{
             referrerPolicy:'no-referrer-when-downgrade',
         };
         this._defaults = clone(this.defaults);
+        this._hooks = [];
     }
 
     /**
@@ -54,6 +55,55 @@ class Comm{
         } else {
             Object.assign(this.defaults, opts);
         }
+    }
+
+    /**
+     * Add a hook to be called before or after a request is made.
+     * By default, hooks are called before the request is made.
+     * By passing pre=false, hooks can be called after the request is made.
+     * Post-hooks are called with a clone of the response object as the last argument; this
+     * means they can read and modify the response without affecting downstream hooks or the
+     * request itself; this also means, however, that post-hooks cannot modify the
+     * response and pass any of those modifications downstream.
+     * @param {Function} func
+     * @param {Boolean=} pre
+     * @returns {string} The id of the hook in the internal array, useful for removing it later.
+     */
+    hook(func, pre = true){
+        const hookId = uniqueId('hook_');
+        this._hooks.push({func, pre, id: hookId});
+        return hookId;
+    }
+
+    /**
+     * Convenience function to add a hook to be called before a request is made.
+     * @see hook
+     * @param {Function} func
+     */
+    before(func){
+        return this.hook(func, true);
+    }
+
+    /**
+     * Convenience function to add a hook to be called after a request is made.
+     * @see hook
+     * @param {Function} func
+     */
+    after(func){
+        return this.hook(func, false);
+    }
+
+    /**
+     * Convenience function to remove one hook,
+     * or, if id is false, remove all hooks.
+     * @param {String|Boolean=} id
+     */
+    unhook(id){
+        if (id === false){
+            this._hooks = [];
+            return;
+        }
+        this._hooks = this._hooks.filter((hook) => hook.id !== id);
     }
 
     /**
@@ -142,7 +192,16 @@ class Comm{
 
         opts.headers = new Headers(headers);
 
-        return fetch(url.toString(), opts).then((res) => {
+        for (const hook of this._hooks.filter((hook) => hook.pre)){
+            await hook.func(url, data, opts);
+        }
+
+        return fetch(url.toString(), opts).then(async (res) => {
+            for (const hook of this._hooks.filter((hook) => !hook.pre)){
+                await hook.func(url, data, opts, res.clone());
+            }
+            return res;
+        }).then((res) => {
             if (!res.ok){
                 throw new CommError(`Failed ${opts.method} against ${url.toString()}`, res);
             }

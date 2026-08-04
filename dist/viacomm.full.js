@@ -150,6 +150,25 @@ function isObjectLike(value) {
  */
 var isArray = Array.isArray;
 
+/** Used to convert symbols to primitives and strings. */
+var symbolProto$1 = Symbol ? Symbol.prototype : undefined;
+    symbolProto$1 ? symbolProto$1.toString : undefined;
+
+/**
+ * The base implementation of `_.toString` which doesn't convert nullish
+ * values to empty strings.
+ *
+ * @private
+ * @param {*} value The value to process.
+ * @returns {string} Returns the string.
+ */
+function baseToString(value) {
+  // Exit early for strings to avoid a performance hit in some environments.
+  {
+    return value;
+  }
+}
+
 /**
  * Checks if `value` is the
  * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
@@ -1314,6 +1333,31 @@ MapCache.prototype.has = mapCacheHas;
 MapCache.prototype.set = mapCacheSet;
 
 /**
+ * Converts `value` to a string. An empty string is returned for `null`
+ * and `undefined` values. The sign of `-0` is preserved.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to convert.
+ * @returns {string} Returns the converted string.
+ * @example
+ *
+ * _.toString(null);
+ * // => ''
+ *
+ * _.toString(-0);
+ * // => '-0'
+ *
+ * _.toString([1, 2, 3]);
+ * // => '1,2,3'
+ */
+function toString(value) {
+  return baseToString(value);
+}
+
+/**
  * Appends the elements of `values` to `array`.
  *
  * @private
@@ -2047,6 +2091,31 @@ function isString(value) {
     (!isArray(value) && isObjectLike(value) && baseGetTag(value) == stringTag);
 }
 
+/** Used to generate unique IDs. */
+var idCounter = 0;
+
+/**
+ * Generates a unique ID. If `prefix` is given, the ID is appended to it.
+ *
+ * @static
+ * @since 0.1.0
+ * @memberOf _
+ * @category Util
+ * @param {string} [prefix=''] The value to prefix the ID with.
+ * @returns {string} Returns the unique ID.
+ * @example
+ *
+ * _.uniqueId('contact_');
+ * // => 'contact_104'
+ *
+ * _.uniqueId();
+ * // => '105'
+ */
+function uniqueId(prefix) {
+  var id = ++idCounter;
+  return toString(prefix) + id;
+}
+
 /**
  * Simple central point for interacting with the server, and a thin layer over the fetch API.
  * @See: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API
@@ -2088,6 +2157,7 @@ class Comm{
             referrerPolicy:'no-referrer-when-downgrade',
         };
         this._defaults = clone(this.defaults);
+        this._hooks = [];
     }
 
     /**
@@ -2101,6 +2171,55 @@ class Comm{
         } else {
             Object.assign(this.defaults, opts);
         }
+    }
+
+    /**
+     * Add a hook to be called before or after a request is made.
+     * By default, hooks are called before the request is made.
+     * By passing pre=false, hooks can be called after the request is made.
+     * Post-hooks are called with a clone of the response object as the last argument; this
+     * means they can read and modify the response without affecting downstream hooks or the
+     * request itself; this also means, however, that post-hooks cannot modify the
+     * response and pass any of those modifications downstream.
+     * @param {Function} func
+     * @param {Boolean=} pre
+     * @returns {string} The id of the hook in the internal array, useful for removing it later.
+     */
+    hook(func, pre = true){
+        const hookId = uniqueId('hook_');
+        this._hooks.push({func, pre, id: hookId});
+        return hookId;
+    }
+
+    /**
+     * Convenience function to add a hook to be called before a request is made.
+     * @see hook
+     * @param {Function} func
+     */
+    before(func){
+        return this.hook(func, true);
+    }
+
+    /**
+     * Convenience function to add a hook to be called after a request is made.
+     * @see hook
+     * @param {Function} func
+     */
+    after(func){
+        return this.hook(func, false);
+    }
+
+    /**
+     * Convenience function to remove one hook,
+     * or, if id is false, remove all hooks.
+     * @param {String|Boolean=} id
+     */
+    unhook(id){
+        if (id === false){
+            this._hooks = [];
+            return;
+        }
+        this._hooks = this._hooks.filter((hook) => hook.id !== id);
     }
 
     /**
@@ -2189,7 +2308,16 @@ class Comm{
 
         opts.headers = new Headers(headers);
 
-        return fetch(url.toString(), opts).then((res) => {
+        for (const hook of this._hooks.filter((hook) => hook.pre)){
+            await hook.func(url, data, opts);
+        }
+
+        return fetch(url.toString(), opts).then(async (res) => {
+            for (const hook of this._hooks.filter((hook) => !hook.pre)){
+                await hook.func(url, data, opts, res.clone());
+            }
+            return res;
+        }).then((res) => {
             if (!res.ok){
                 throw new CommError(`Failed ${opts.method} against ${url.toString()}`, res);
             }
