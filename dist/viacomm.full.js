@@ -2108,7 +2108,7 @@ class Comm{
      * @param {{headers:(object|Function)=, body:*=, url:string, data:(object|string)=, method:string=}} opts
      * @returns {Promise<Response>}
      */
-    request(opts){
+    async request(opts){
         let headers = this.defaults.headers,
             optsHeaders = opts.headers;
 
@@ -2130,7 +2130,7 @@ class Comm{
          */
         for (const [key, func] of Object.entries(opts)){
             if (isFunction(func)){
-                opts[key] = func(opts);
+                opts[key] = await func(opts);
             }
         }
 
@@ -2172,18 +2172,18 @@ class Comm{
          * Extend headers separately to avoid clobbering values when attempting to add headers.
          */
         if (isFunction(headers)){
-            headers = headers(url, data, opts);
+            headers = await headers(url, data, opts);
         }
 
         if (isFunction(optsHeaders)){
-            optsHeaders = optsHeaders(url, data, opts);
+            optsHeaders = await optsHeaders(url, data, opts);
         }
 
         headers = Object.assign({}, headers, optsHeaders);
 
         for (const [key, func] of Object.entries(headers)){
             if (isFunction(func)){
-                headers[key] = func(url, data, opts);
+                headers[key] = await func(url, data, opts);
             }
         }
 
@@ -2201,7 +2201,7 @@ class Comm{
      * Simple proxy to request for a common use-case - sending json.
      * @returns {Promise<Response>}
      */
-    json(opts){
+    async json(opts){
         opts = clone(opts ?? {});
 
         let optsHeaders = opts.headers;
@@ -2262,7 +2262,7 @@ class Comm{
  * @lends Comm.prototype
  */
 Object.assign(Comm.prototype, verbs.reduce((obj, verb) => {
-    obj[verb] = function(opts, json = true){
+    obj[verb] = async function(opts, json = true){
         opts = opts ?? {};
         opts.method = verb.toUpperCase();
         return (json && !nobodyVerbs.includes(verb)) ? this.json(opts) : this.request(opts);

@@ -1,6 +1,6 @@
 {
     "name": "viacomm",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "type": "module",
     "description": "Thin layer over the fetch API, with built-in support for Vue 3.",
     "main": "dist/viacomm.js",

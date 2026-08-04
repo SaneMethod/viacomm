@@ -128,11 +128,11 @@ describe("Comm constructor and configuration", () => {
 });
 
 describe("request", () => {
-    it("throws when url is missing", () => {
+    it("throws when url is missing", async () => {
         const client = new Comm();
 
-        assert.throws(
-            () => client.request({}),
+        await assert.rejects(
+            client.request({}),
             {
                 name: "Error",
                 message: "You must define a 'url' to make the request against.",
@@ -476,7 +476,10 @@ describe("json", () => {
         const fetch = fetchSpy();
         const client = new Comm();
 
-        assert.throws(() => client.json(), /define a 'url'/);
+        await assert.rejects(
+            client.json(),
+            /define a 'url'/,
+        );
         assert.equal(fetch.calls.length, 0);
     });
 

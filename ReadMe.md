@@ -105,7 +105,7 @@ Request-specific options take precedence over configured defaults.
 
 ### `request(options)`
 
-`request()` accepts Fetch options plus the following ViaComm-specific options:
+`request()` is an asynchronous method that returns a `Promise<Response>`. It accepts Fetch options plus the following ViaComm-specific options:
 
 | Option | Type | Description |
 | --- | --- | --- |
@@ -114,6 +114,14 @@ Request-specific options take precedence over configured defaults.
 | `headers` | `object` or `Function` | Headers for this request. |
 | `method` | `string` | HTTP method, such as `GET`, `POST`, `PUT`, or `DELETE`. |
 | `body` | `any` | Standard Fetch request body. `data` takes precedence for non-`GET`/`HEAD` requests. |
+
+Always `await` the returned promise or handle it with `.then()`:
+
+```js
+const response = await comm.request({
+    url: "/api/products"
+});
+```
 
 A relative URL:
 
@@ -168,11 +176,36 @@ For methods other than `GET` and `HEAD`, `data` is assigned to the Fetch request
 
 For JSON payloads, use `json()` instead.
 
+## HTTP Verb Shortcuts
+
+`delete()`, `get()`, `head()`, `patch()`, `post()`, `put()`, and `options()` are asynchronous convenience methods. Each returns a `Promise<Response>`, so calls should be awaited or handled as promises.
+
+`GET` and `HEAD` shortcuts use query parameters and do not use JSON handling by default.
+
+All other shortcuts send data as JSON by default.
+
+```js
+const response = await comm.post("/api/products", {
+    data: {
+        name: "Example product"
+    }
+});
+```
+
+To send a non-JSON request, pass `false` as the second argument:
+
+```js
+const response = await comm.post({
+    url: "/api/products",
+    data: "product data"
+}, false);
+```
+
 ## JSON Requests
 
 ### `json(options)`
 
-`json()` is a convenience method for requests that send JSON. It:
+`json()` is an asychronous convenience method that returns a `Promise<Response>` for requests that send JSON. It:
 
 - Sets the `Accept` header to `application/json, text/plain, */*`
 - Sets the `Content-Type` header to `application/json`
@@ -268,12 +301,17 @@ try {
 }
 ```
 
-A missing `url` throws an error before the request is sent:
+A missing `url` causes the returned promise to reject:
 
 ```js
+try {
     await comm.request({});
+} catch (error) {
     // Error: You must define a 'url' to make the request against.
+}
 ```
+
+The same behavior applies to `json()` and all HTTP verb shortcuts.
 
 ## Using ViaComm with Vue 3
 
