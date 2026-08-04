@@ -721,6 +721,17 @@ describe("json", () => {
         assert.equal(fetch.calls.length, 0);
     });
 
+    it("falls back to cloneDeep when structuredClone cannot clone", async () => {
+        const fetch = fetchSpy();
+        const client = new Comm();
+
+        await client.json({
+            url: new URL("https://api.example.test/users"),
+        });
+
+        assert.equal(fetch.calls[0][0], "https://api.example.test/users");
+    });
+
     it("serializes non-string data and adds JSON headers", async () => {
         const fetch = fetchSpy();
         const client = new Comm();
