@@ -139,16 +139,18 @@ class Comm{
 
         let url = opts.url;
         const data = opts.data;
+        const base = opts.baseURL;
 
         delete opts.url;
         delete opts.data;
+        delete opts.baseURL;
 
         if (!url){
             throw new Error("You must define a 'url' to make the request against.");
         }
 
         if (isString(url)){
-            url = (url.indexOf('://') === -1) ? new URL(url, window.location.origin) : new URL(url);
+            url = (url.indexOf('://') === -1) ? new URL(url, base||window.location.origin) : new URL(url);
         }
 
         /**
