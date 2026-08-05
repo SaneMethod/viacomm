@@ -2330,7 +2330,14 @@ class Comm{
      * @returns {Promise<Response>}
      */
     async json(opts){
-        opts = clone(opts ?? {});
+        try {
+            opts = clone(opts ?? {});
+        } catch (e) {
+            if (e instanceof DOMException && e.name === 'DataCloneError'){
+                // Fall back to lodash deep clone if cloning fails.
+                opts = cloneDeep(opts);
+            }
+        }
 
         let optsHeaders = opts.headers;
         delete opts.headers;
