@@ -2255,7 +2255,7 @@ class Comm{
 
         let url = opts.url;
         const data = opts.data;
-        const base = opts.baseURL;
+        const baseURL = opts.baseURL;
 
         delete opts.url;
         delete opts.data;
@@ -2266,7 +2266,7 @@ class Comm{
         }
 
         if (isString(url)){
-            url = (url.indexOf('://') === -1) ? new URL(url, base||window.location.origin) : new URL(url);
+            url = (url.indexOf('://') === -1) ? new URL(url, baseURL||window.location.origin) : new URL(url);
         }
 
         /**

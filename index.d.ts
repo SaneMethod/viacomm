@@ -1,8 +1,14 @@
-export type RequestData = Record<string, unknown> | string | URLSearchParams | FormData | null | undefined;
+export type RequestData =
+    | Record<string, unknown>
+    | string
+    | URLSearchParams
+    | FormData
+    | null
+    | undefined;
 
 export type RequestOptionValue<T = unknown> =
     | T
-    | ((options: RequestOptions) => T);
+    | ((options: RequestOptions) => T | Promise<T>);
 
 export type HeaderValue =
     | string
@@ -10,7 +16,13 @@ export type HeaderValue =
     | boolean
     | null
     | undefined
-    | (() => string | number | boolean | null | undefined);
+    | (() =>
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | Promise<string | number | boolean | null | undefined>);
 
 export type HeaderInit = Record<string, HeaderValue>;
 
@@ -18,30 +30,41 @@ export type HeaderFunction = (
     url: URL,
     data: RequestData,
     options: RequestOptions
-) => HeaderInit;
+) => HeaderInit | Promise<HeaderInit>;
 
 export type CommHeaders = HeaderInit | HeaderFunction;
 
-export interface RequestOptions extends Omit<RequestInit, "headers" | "body" | "method"> {
+export interface RequestOptions
+    extends Omit<RequestInit, "headers" | "body" | "method"> {
     url: string | URL;
-    data?: RequestData;
-    body?: BodyInit | null | RequestOptionValue<BodyInit | null>;
+    data?: RequestOptionValue<RequestData>;
+    body?: RequestOptionValue<BodyInit | null>;
+    method?: string;
+    headers?: CommHeaders;
+    baseURL?: string | URL;
+    [key: string]: unknown;
+}
+
+export interface CommDefaults
+    extends Omit<RequestInit, "headers" | "body" | "method"> {
     method?: string;
     headers?: CommHeaders;
     [key: string]: unknown;
 }
 
-export interface CommDefaults extends Omit<RequestInit, "headers" | "body" | "method"> {
-    method?: string;
-    headers?: CommHeaders;
-    [key: string]: unknown;
-}
-
-export type VerbOptions = Omit<RequestOptions, "method"> & {
+export type VerbOptions = Omit<RequestOptions, "method" | "url"> & {
+    url?: string | URL;
     method?: string;
 };
 
 export type ConfigureOptions = Partial<CommDefaults>;
+
+export type CommHook = (
+    url: URL,
+    data: RequestData,
+    options: RequestOptions,
+    response?: Response
+) => void | Promise<void>;
 
 export class CommError extends Error {
     response: Response;
@@ -56,9 +79,17 @@ export class Comm {
 
     configure(options?: ConfigureOptions | false | null): void;
 
+    hook(func: CommHook, pre?: boolean): string;
+
+    before(func: CommHook): string;
+
+    after(func: CommHook): string;
+
+    unhook(id: string | false): void;
+
     request(options: RequestOptions): Promise<Response>;
 
-    json(options?: RequestOptions): Promise<Response>;
+    json(options?: Omit<RequestOptions, "url"> & { url?: string | URL }): Promise<Response>;
 
     delete(options?: VerbOptions, json?: boolean): Promise<Response>;
 
