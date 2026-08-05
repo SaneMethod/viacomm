@@ -131,6 +131,35 @@ const response = await comm.request({
 });
 ```
 
+To resolve a relative URL against an API host, provide `baseURL`:
+
+```js
+const response = await comm.request({
+    baseURL: "https://api.example.com/v1/",
+    url: "/products"
+});
+```
+
+The resulting request is sent to `https://api.example.com/products`. `baseURL` only affects relative URLs; an absolute `url` remains unchanged:
+
+```js
+const response = await comm.request({
+    baseURL: "https://api.example.com/v1/",
+    url: "https://uploads.example.com/image.png"
+});
+```
+
+To use the full baseURL with a relative URL, don't lead with a slash:
+
+```js
+const response = await comm.request({
+    baseURL: "https://api.example.com/v1/",
+    url: "products"
+});
+```
+
+The resulting request is sent to `https://api.example.com/v1/products`.
+
 An absolute URL:
 
 ```js

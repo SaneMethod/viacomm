@@ -157,6 +157,30 @@ describe("request", () => {
         assert.equal(fetch.calls[0][0], "https://app.example.test/users");
     });
 
+    it("uses baseURL origin for relative URLs with leading slashes", async () => {
+        const fetch = fetchSpy();
+        const client = new Comm();
+
+        await client.request({
+            baseURL: "https://api.example.test/v1/",
+            url: "/users",
+        });
+
+        assert.equal(fetch.calls[0][0], "https://api.example.test/users");
+    });
+
+    it("uses baseURL for relative URLs", async () => {
+        const fetch = fetchSpy();
+        const client = new Comm();
+
+        await client.request({
+            baseURL: "https://api.example.test/v1/",
+            url: "users",
+        });
+
+        assert.equal(fetch.calls[0][0], "https://api.example.test/v1/users");
+    });
+
     it("preserves absolute URLs", async () => {
         const fetch = fetchSpy();
         const client = new Comm();
@@ -166,6 +190,18 @@ describe("request", () => {
         });
 
         assert.equal(fetch.calls[0][0], "https://api.example.test/users");
+    });
+
+    it("preserves absolute URLs when baseURL is provided", async () => {
+        const fetch = fetchSpy();
+        const client = new Comm();
+
+        await client.request({
+            baseURL: "https://api.example.test/v1/",
+            url: "https://other.example.test/users",
+        });
+
+        assert.equal(fetch.calls[0][0], "https://other.example.test/users");
     });
 
     it("accepts a URL instance", async () => {
