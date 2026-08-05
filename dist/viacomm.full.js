@@ -2239,7 +2239,7 @@ class Comm{
         // which depend on the resolved value of a function opt declared ahead of it.
         // @See: `evaluates function-valued request options` in the test suite for an example.
         opts = Object.assign({},
-            Object.fromEntries(Object.entries(this._defaults).filter(([key]) => !(key in opts))),
+            Object.fromEntries(Object.entries(this.defaults).filter(([key]) => !(key in opts))),
             opts
         );
 
