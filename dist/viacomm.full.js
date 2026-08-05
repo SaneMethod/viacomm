@@ -2231,9 +2231,6 @@ class Comm{
         let headers = this.defaults.headers,
             optsHeaders = opts.headers;
 
-        // We'll handle these separately, and don't want to expand them as part of the usual opts processing.
-        delete opts.headers;
-
         // Don't include props found in opts from this.defaults to prevent key insertion order from
         // being a surprise for consumers of this library; this matters where opts are defined as functions,
         // which depend on the resolved value of a function opt declared ahead of it.
@@ -2242,6 +2239,9 @@ class Comm{
             Object.fromEntries(Object.entries(this.defaults).filter(([key]) => !(key in opts))),
             opts
         );
+
+        // We'll handle these separately, and don't want to expand them as part of the usual opts processing.
+        delete opts.headers;
 
         /**
          * Allow expansion of any opts set as functions to their return values
