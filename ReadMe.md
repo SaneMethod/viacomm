@@ -377,8 +377,6 @@ const hookId = comm.after(async (url, data, options, response) => {
     const requestLog = await response.json();
     console.log(`${options.method} ${url} returned ${response.status}`);
     console.log("Request log:", requestLog);
-
-    return response;
 });
 ```
 
@@ -386,12 +384,24 @@ After hooks may be synchronous or asynchronous. If an after hook returns a promi
 ViaComm waits for that promise to resolve before continuing the request pipeline.
 
 After hooks receive the same URL, data, and options arguments, followed by a clone of
-the response. The cloned response allows the hook to inspect or modify its copy without
-changing the response used by the request pipeline.
+the current response. Reading the clone does not consume the response used by the
+request pipeline.
 
-An after hook should return the response, or a promise that resolves to the response,
-that should continue through the request pipeline. If the response is unsuccessful,
-the returned promise rejects with a `CommError` after the hook has run.
+An after hook may return a `Response` to replace the current response. Later after
+hooks receive clones of that replacement, and the final replacement is returned to
+the caller:
+
+```js
+comm.after(async (url, data, options, response) => {
+    if (response.status === 204) {
+        return new Response(JSON.stringify({items: []}), {status: 200, headers: {"Content-Type": "application/json"}});
+    }
+});
+```
+
+Returning `undefined` or any non-`Response` value leaves the current response
+unchanged. After all hooks have run, an unsuccessful current response causes the
+request to reject with a `CommError`.
 
 ### Using `hook()` Directly
 

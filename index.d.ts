@@ -64,7 +64,7 @@ export type CommHook = (
     data: RequestData,
     options: RequestOptions,
     response?: Response
-) => void | Promise<void>;
+) => void | Response | Promise<void | Response>;
 
 export class CommError extends Error {
     response: Response;

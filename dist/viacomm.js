@@ -61,10 +61,9 @@ class Comm{
      * Add a hook to be called before or after a request is made.
      * By default, hooks are called before the request is made.
      * By passing pre=false, hooks can be called after the request is made.
-     * Post-hooks are called with a clone of the response object as the last argument; this
-     * means they can read and modify the response without affecting downstream hooks or the
-     * request itself; this also means, however, that post-hooks cannot modify the
-     * response and pass any of those modifications downstream.
+     * Post-hooks receive a clone of the current response. If a post-hook returns a
+     * Response, it replaces the current response for downstream hooks and the caller.
+     * Other return values are ignored.
      * @param {Function} func
      * @param {Boolean=} pre
      * @returns {string} The id of the hook in the internal array, useful for removing it later.
@@ -200,7 +199,10 @@ class Comm{
 
         return fetch(url.toString(), opts).then(async (res) => {
             for (const hook of this._hooks.filter((hook) => !hook.pre)){
-                await hook.func(url, data, opts, res.clone());
+                const after = await hook.func(url, data, opts, res.clone());
+                if (after instanceof Response){
+                    res = after;
+                }
             }
             return res;
         }).then((res) => {

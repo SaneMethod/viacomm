@@ -16,8 +16,12 @@
     ],
     "author": "sanemethod",
     "license": "MPL-2.0",
-    "homepage": "https://github.com/SaneMethod/viacomm/blob/master/ReadMe.md",
-    "repository": "https://github.com/SaneMethod/viacomm",
+    "homepage": "https://github.com/SaneMethod/viacomm/",
+    "readme": "https://github.com/SaneMethod/viacomm/blob/master/ReadMe.md",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/SaneMethod/viacomm.git"
+    },
     "peerDependencies": {
         "vue": "3.x",
         "lodash-es": "4.18.0"
@@ -30,9 +34,7 @@
             "optional": true
         }
     },
-    "dependencies": {
-
-    },
+    "dependencies": {},
     "devDependencies": {
         "@rollup/plugin-node-resolve": "^15.3.1",
         "@rollup/plugin-terser": "^1.0.0",

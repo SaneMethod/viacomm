@@ -464,7 +464,6 @@ describe("request hooks", () => {
                 ok: true,
                 status: 200,
             });
-            return expected;
         });
 
         const actual = await client.request({
@@ -473,6 +472,88 @@ describe("request hooks", () => {
 
         assert.deepEqual(events, ["fetch", "after"]);
         assert.strictEqual(actual, expected);
+    });
+
+    it("uses a Response returned by an after hook", async () => {
+        const original = new Response("original");
+        const replacement = new Response("replacement", {
+            headers: {
+                "X-Replaced": "yes",
+            },
+        });
+        const client = new Comm();
+
+        fetchSpy(original);
+        client.after(async () => replacement);
+
+        const actual = await client.request({
+            url: "/users",
+        });
+
+        assert.strictEqual(actual, replacement);
+        assert.equal(actual.headers.get("X-Replaced"), "yes");
+        assert.equal(await actual.text(), "replacement");
+    });
+
+    it("passes replacement responses to downstream after hooks", async () => {
+        const original = new Response("original");
+        const replacement = new Response("replacement");
+        const client = new Comm();
+        let downstreamResponse;
+
+        fetchSpy(original);
+
+        client.after(() => replacement);
+        client.after((url, data, options, hookedResponse) => {
+            downstreamResponse = hookedResponse;
+        });
+
+        const actual = await client.request({
+            url: "/users",
+        });
+
+        assert.strictEqual(actual, replacement);
+        assert.notStrictEqual(downstreamResponse, replacement);
+        assert.equal(await downstreamResponse.text(), "replacement");
+    });
+
+    it("ignores non-Response return values from after hooks", async () => {
+        const original = new Response("original");
+        const client = new Comm();
+
+        fetchSpy(original);
+        client.after(() => ({
+            ok: true,
+            status: 201,
+        }));
+
+        const actual = await client.request({
+            url: "/users",
+        });
+
+        assert.strictEqual(actual, original);
+    });
+
+    it("rejects an unsuccessful replacement response with CommError", async () => {
+        const original = new Response("original");
+        const replacement = new Response("failed", {
+            status: 503,
+        });
+        const client = new Comm();
+
+        fetchSpy(original);
+        client.after(() => replacement);
+
+        await assert.rejects(
+            client.request({
+                url: "/users",
+            }),
+            (error) => {
+                assert.equal(error instanceof CommError, true);
+                assert.strictEqual(error.response, replacement);
+                return true;
+            },
+        );
     });
 
     it("preserves hook registration order", async () => {
