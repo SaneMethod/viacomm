@@ -127,10 +127,10 @@ class Comm{
 
         /**
          * Allow expansion of any opts set as functions to their return values
-         * at this time.
+         * at this time. Skip private values (preceded by at least one `_`).
          */
         for (const [key, func] of Object.entries(opts)){
-            if (isFunction(func)){
+            if (isFunction(func) && !key.startsWith('_')){
                 opts[key] = await func(opts);
             }
         }
